@@ -1,156 +1,130 @@
-<<<<<<< HEAD
-// frontend/src/Board.jsx
-import { DndContext, useDraggable, useDroppable } from '@dnd-kit/core';
+import { closestCenter, DndContext } from '@dnd-kit/core';
+import {
+  SortableContext,
+  useSortable,
+  verticalListSortingStrategy
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+import { useEffect, useState } from 'react';
+import { buscarTarefas } from './api';
 
-export default function Board({ tarefas, moverTarefa }) {
-  const agrupadas = tarefas.reduce((acc, t) => {
-    const cat = t.categoria || 'Sem Categoria';
-    if (!acc[cat]) acc[cat] = [];
-    acc[cat].push(t);
-    return acc;
-  }, {});
+const columns = ['todo', 'doing', 'done'];
 
-  return (
-    <DndContext onDragEnd={({ active, over }) => {
-      if (!over) return;
-      const from = active.data.current?.categoria;
-      const to = over.id;
-      if (from !== to) moverTarefa(active.id, to);
-    }}>
-      <div className="flex gap-4 overflow-x-auto">
-        {Object.entries(agrupadas).map(([cat, tarefas]) => (
-          <Coluna key={cat} nome={cat} tarefas={tarefas} />
-        ))}
-      </div>
-    </DndContext>
-  );
-}
+const columnNames = {
+  todo: 'A Fazer',
+  doing: 'Em Progresso',
+  done: 'Concluído',
+};
 
-function Coluna({ nome, tarefas }) {
-  const { setNodeRef } = useDroppable({ id: nome });
-  return (
-    <div ref={setNodeRef} className="bg-gray-100 rounded-lg p-4 w-80 min-w-80">
-      <h2 className="font-bold text-lg mb-4 text-center">{nome}</h2>
-      {tarefas.map(t => (
-        <Card key={t.id} tarefa={t} categoria={nome} />
-      ))}
-    </div>
-  );
-}
+// Componente de tarefa que pode ser arrastado
+function TarefaCard({ id, conteudo }) {
+  const { attributes, listeners, setNodeRef, transform, transition } =
+    useSortable({ id });
 
-function Card({ tarefa, categoria }) {
-  const { attributes, listeners, setNodeRef, transform } = useDraggable({
-    id: tarefa.id,
-    data: { categoria }
-  });
-
-  const style = transform
-    ? { transform: `translate(${transform.x}px, ${transform.y}px)` }
-    : undefined;
-
-  const toggleFeita = async () => {
-    const res = await fetch(`${import.meta.env.VITE_API_URL}/tarefas/${tarefa.id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ feita: !tarefa.feita })
-    });
-
-    const atualizada = await res.json();
-    // Atualizar localmente ou via prop se preferir
-    tarefa.feita = atualizada.feita;
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    padding: '1rem',
+    backgroundColor: '#fff',
+    borderRadius: '8px',
+    boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+    marginBottom: '0.5rem',
+    cursor: 'grab',
   };
 
   return (
-    <div
-      ref={setNodeRef}
-      {...listeners}
-      {...attributes}
-      style={style}
-      onDoubleClick={toggleFeita}
-      className={`rounded shadow p-4 mb-3 cursor-pointer select-none transition duration-300 ${tarefa.feita ? 'bg-green-100 line-through text-gray-400' : 'bg-white'
-        }`}
-    >
-      <h4 className="font-medium">{tarefa.descricao}</h4>
-      <p className="text-sm text-gray-500">⏰ {tarefa.horario}</p>
-      {tarefa.feita && <p className="text-xs mt-1 text-green-600 font-bold">✔ Feita</p>}
-    </div>
-  );
-=======
-// frontend/src/Board.jsx
-import { DndContext, useDraggable, useDroppable } from '@dnd-kit/core';
-
-export default function Board({ tarefas, moverTarefa }) {
-  const agrupadas = tarefas.reduce((acc, t) => {
-    const cat = t.categoria || 'Sem Categoria';
-    if (!acc[cat]) acc[cat] = [];
-    acc[cat].push(t);
-    return acc;
-  }, {});
-
-  return (
-    <DndContext onDragEnd={({ active, over }) => {
-      if (!over) return;
-      const from = active.data.current?.categoria;
-      const to = over.id;
-      if (from !== to) moverTarefa(active.id, to);
-    }}>
-      <div className="flex gap-4 overflow-x-auto">
-        {Object.entries(agrupadas).map(([cat, tarefas]) => (
-          <Coluna key={cat} nome={cat} tarefas={tarefas} />
-        ))}
-      </div>
-    </DndContext>
-  );
-}
-
-function Coluna({ nome, tarefas }) {
-  const { setNodeRef } = useDroppable({ id: nome });
-  return (
-    <div ref={setNodeRef} className="bg-gray-100 rounded-lg p-4 w-80 min-w-80">
-      <h2 className="font-bold text-lg mb-4 text-center">{nome}</h2>
-      {tarefas.map(t => (
-        <Card key={t.id} tarefa={t} categoria={nome} />
-      ))}
+    <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
+      {conteudo}
     </div>
   );
 }
 
-function Card({ tarefa, categoria }) {
-  const { attributes, listeners, setNodeRef, transform } = useDraggable({
-    id: tarefa.id,
-    data: { categoria }
+// Componente principal do board
+export default function Board() {
+  const [tarefas, setTarefas] = useState([]);
+  const [tarefasPorColuna, setTarefasPorColuna] = useState({
+    todo: [],
+    doing: [],
+    done: [],
   });
 
-  const style = transform
-    ? { transform: `translate(${transform.x}px, ${transform.y}px)` }
-    : undefined;
+  // Carrega tarefas da API
+  useEffect(() => {
+    async function carregar() {
+      const dados = await buscarTarefas();
 
-  const toggleFeita = async () => {
-    const res = await fetch(`${import.meta.env.VITE_API_URL}/tarefas/${tarefa.id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ feita: !tarefa.feita })
-    });
+      // Organiza por status
+      const porColuna = { todo: [], doing: [], done: [] };
+      dados.forEach((tarefa) => {
+        const status = tarefa.status || 'todo';
+        porColuna[status].push({ id: tarefa.id.toString(), conteudo: tarefa.titulo });
+      });
+      setTarefas(dados);
+      setTarefasPorColuna(porColuna);
+    }
+    carregar();
+  }, []);
 
-    const atualizada = await res.json();
-    // Atualizar localmente ou via prop se preferir
-    tarefa.feita = atualizada.feita;
-  };
+  // Handler de drag and drop
+  function handleDragEnd(event) {
+    const { active, over } = event;
+    if (!over) return;
+
+    const origem = encontrarColuna(active.id);
+    const destino = encontrarColuna(over.id);
+
+    if (!origem || !destino) return;
+
+    if (origem !== destino) {
+      const tarefaMovida = tarefasPorColuna[origem].find((t) => t.id === active.id);
+
+      setTarefasPorColuna((prev) => {
+        const novoOrigem = prev[origem].filter((t) => t.id !== active.id);
+        const novoDestino = [tarefaMovida, ...prev[destino]];
+        return {
+          ...prev,
+          [origem]: novoOrigem,
+          [destino]: novoDestino,
+        };
+      });
+
+      // Aqui você poderia chamar a API para atualizar o status da tarefa no backend
+      // ex: atualizarTarefaStatus(active.id, destino)
+    }
+  }
+
+  function encontrarColuna(tarefaId) {
+    return columns.find((coluna) =>
+      tarefasPorColuna[coluna].some((t) => t.id === tarefaId)
+    );
+  }
 
   return (
-    <div
-      ref={setNodeRef}
-      {...listeners}
-      {...attributes}
-      style={style}
-      onDoubleClick={toggleFeita}
-      className={`rounded shadow p-4 mb-3 cursor-pointer select-none transition duration-300 ${tarefa.feita ? 'bg-green-100 line-through text-gray-400' : 'bg-white'
-        }`}
-    >
-      <h4 className="font-medium">{tarefa.descricao}</h4>
-      <p className="text-sm text-gray-500">⏰ {tarefa.horario}</p>
-      {tarefa.feita && <p className="text-xs mt-1 text-green-600 font-bold">✔ Feita</p>}
+    <div style={{ display: 'flex', gap: '1rem', padding: '1rem' }}>
+      <DndContext collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+        {columns.map((coluna) => (
+          <div
+            key={coluna}
+            style={{
+              flex: 1,
+              backgroundColor: '#f1f1f1',
+              borderRadius: '10px',
+              padding: '1rem',
+              minHeight: '300px',
+            }}
+          >
+            <h3 style={{ textAlign: 'center' }}>{columnNames[coluna]}</h3>
+            <SortableContext
+              items={tarefasPorColuna[coluna].map((t) => t.id)}
+              strategy={verticalListSortingStrategy}
+            >
+              {tarefasPorColuna[coluna].map((tarefa) => (
+                <TarefaCard key={tarefa.id} id={tarefa.id} conteudo={tarefa.conteudo} />
+              ))}
+            </SortableContext>
+          </div>
+        ))}
+      </DndContext>
     </div>
   );
->>>>>>> 9b22580 (Início do projeto limpo)
 }

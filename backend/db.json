@@ -1,0 +1,23 @@
+[
+    {
+        "id": "1",
+        "descricao": "Lavar louça",
+        "horario": "08:00",
+        "categoria": "Casa",
+        "feita": false
+    },
+    {
+        "id": "2",
+        "descricao": "Estudar React",
+        "horario": "10:00",
+        "categoria": "Estudos",
+        "feita": false
+    },
+    {
+        "id": "3",
+        "descricao": "Fazer compras",
+        "horario": "15:00",
+        "categoria": "Compras",
+        "feita": false
+    }
+]
